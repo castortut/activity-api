@@ -88,6 +88,7 @@ def get_activity():
             "id": id,
             "alias": alias,
             "history": history,
+            "latest": history[-1],
         })
 
     return jsonify(sensors)
