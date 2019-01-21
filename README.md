@@ -40,3 +40,5 @@ MQTT_URL = "mqtt.yourdomain.tld"
 - Log the values into a database instead of into memory in order to not loose data on restarts
 
 - Make the aliases configurable in a database instead of hard coding and requiring a new deployment to change
+
+- Make the MQTT_URL an environment variable instead of hard-coding it in the source code
