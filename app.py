@@ -15,6 +15,7 @@ ALIASES = {
     "91150":    "robo",
     "14694519": "säätöpöytä",
     "14693932": "lounge",
+    "7244792":  "elepiste",
 }
 
 MQTT_URL = "mqtt.svc.cave.avaruuskerho.fi"
