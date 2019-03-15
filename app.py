@@ -1,6 +1,7 @@
 import datetime
+import json
 
-from flask import Flask, jsonify
+from flask import Flask, request
 from flask_mqtt import Mqtt
 
 ########
@@ -104,7 +105,6 @@ def handle_logging(client, userdata, level, buf) -> None:
     if LOG_LEVELS[level] != 'DEBUG':
         print(f"{LOG_LEVELS[level]}: {buf}")
 
-
 @app.route("/")
 def get_activity():
     """
@@ -123,7 +123,10 @@ def get_activity():
             "latest": history[-1],
         })
 
-    return jsonify(sensors)
+    if 'pretty' in request.args.keys():
+        return json.dumps(sensors, sort_keys=True, indent=4, separators=(',', ': '))
+    else:
+        return json.dumps(sensors)
 
 
 if __name__ == '__main__':
