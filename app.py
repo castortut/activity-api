@@ -1,8 +1,11 @@
 import datetime
 import json
+import os
 
 from flask import Flask, request
 from flask_mqtt import Mqtt
+
+import psycopg2
 
 ########
 # Conf #
@@ -10,15 +13,8 @@ from flask_mqtt import Mqtt
 
 HISTORY_LENGTH = 10
 
-ALIASES = {
-    "14693767": "isel",
-    "91150":    "robo",
-    "14694519": "säätöpöytä",
-    "14693932": "lounge",
-    "7244792":  "elepiste",
-}
-
-MQTT_URL = "mqtt.svc.cave.avaruuskerho.fi"
+MQTT_URL = os.environ.get("MQTT_URL", "mqtt.svc.cave.avaruuskerho.fi")
+DB_URL = os.environ.get("DB_URL", "postgres://postgres@localhost:5432")
 
 ############
 # Conf end #
@@ -45,6 +41,9 @@ app.config['MQTT_TLS_ENABLED'] = False  # set TLS to disabled for testing purpos
 
 mqtt = Mqtt(app)
 
+conn = psycopg2.connect(DB_URL)
+cursor = conn.cursor()
+
 
 def add_activity(id: str) -> None:
     """
@@ -52,19 +51,10 @@ def add_activity(id: str) -> None:
 
     :param id: ID of the sensor that registered activity
     """
-    # Initialize if new sensor
-    if id not in activity.keys():
-        activity[id] = []
 
-    # Get the current date in ISO8601 with TZ information
-    date = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
-
-    # Add activity to the list
-    activity[id].append(date)
-
-    # Remove the oldest item if over the limit
-    if len(activity[id]) > HISTORY_LENGTH:
-        activity[id].pop(0)
+    cursor.execute("INSERT INTO sensor_events (sensor, date) VALUES (%s, %s);",
+                   (id, datetime.datetime.utcnow()))
+    conn.commit()
 
 
 @mqtt.on_connect()
@@ -106,28 +96,66 @@ def handle_logging(client, userdata, level, buf) -> None:
     if LOG_LEVELS[level] != 'DEBUG':
         print(f"{LOG_LEVELS[level]}: {buf}")
 
+
+def get_sensors():
+    """
+    Get the list of known sensors from the database
+
+    :return: list of sensors
+    """
+    cursor.execute("SELECT DISTINCT sensor FROM sensor_events;")
+    return [row[0] for row in cursor.fetchall()]
+
+
+def get_history(sensor):
+    """
+    Get last $HISTORY_LENGTH values from the given sensor
+
+    :param sensor: id of the sensor to query
+    :return: list of timestamps
+    """
+    cursor.execute("SELECT date FROM sensor_events "
+                   "WHERE sensor = '%s' "
+                   "ORDER BY date DESC LIMIT %s;", (sensor, HISTORY_LENGTH))
+    return [row[0].replace(tzinfo=datetime.timezone.utc).isoformat() for row in cursor.fetchall()]
+
+
+def get_alias(sensor):
+    """
+    Get the alias of a sensor, if known
+
+    :param sensor: id of the sensor
+    :return: sensor alias
+    """
+    cursor.execute("SELECT alias FROM sensor_aliases "
+                   "WHERE id = '%s';", (sensor,))
+    result = cursor.fetchone()
+    return result[0] if result else None
+
+
 @app.route("/")
 def get_activity():
     """
     A Flask route that responds to requests on the URL '/'. Builds an JSON object from the stored data.
     """
-    sensors = []
-    for sensor in activity.keys():
-        id = sensor
-        alias = ALIASES.get(id, None)
-        history = activity[id]
 
-        sensors.append({
-            "id": id,
+    response = []
+
+    for sensor in get_sensors():
+        history = get_history(sensor)
+        alias = get_alias(sensor)
+
+        response.append({
+            "id": sensor,
             "alias": alias,
             "history": history,
             "latest": history[-1],
         })
 
     if 'pretty' in request.args.keys():
-        return json.dumps(sensors, sort_keys=True, indent=4, separators=(',', ': '))
+        return json.dumps(response, sort_keys=True, indent=4, separators=(',', ': '))
     else:
-        return json.dumps(sensors)
+        return json.dumps(response)
 
 
 if __name__ == '__main__':
