@@ -149,7 +149,7 @@ def get_activity():
             "id": sensor,
             "alias": alias,
             "history": history,
-            "latest": history[-1],
+            "latest": history[0],
         })
 
     if 'pretty' in request.args.keys():
