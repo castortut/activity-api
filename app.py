@@ -119,6 +119,44 @@ def get_history(sensor):
                    "ORDER BY date DESC LIMIT %s;", (sensor, HISTORY_LENGTH))
     return [row[0].replace(tzinfo=datetime.timezone.utc).isoformat() for row in cursor.fetchall()]
 
+def get_history_ranges():
+    query = """
+        WITH differences AS (
+            SELECT 
+                sensor, 
+                alias,
+                date, 
+                LAG(date, 1) OVER ( 
+                    PARTITION BY sensor 
+                    ORDER BY date ASC) previous_date,
+                LAG(date, 1) OVER ( 
+                    PARTITION BY sensor 
+                    ORDER BY date DESC) next_date 
+            FROM sensor_events JOIN sensor_aliases ON sensor_events.sensor = sensor_aliases.id
+            WHERE date BETWEEN NOW() - INTERVAL '48h' AND NOW()) 
+
+        ( 
+            SELECT 
+                sensor, 
+                alias,
+                date, 
+                'START' as type 
+            FROM differences 
+            WHERE date - previous_date > INTERVAL '1h' OR previous_date IS NULL
+        ) UNION (
+            SELECT 
+                sensor, 
+                alias,
+                date, 
+                'END' as type 
+            FROM differences 
+            WHERE next_date - date > INTERVAL '1h' OR next_date IS NULL
+        )
+        ORDER BY date ASC, type DESC;
+    """
+    cursor.execute(query)
+    results = cursor.fetchall()
+    return results
 
 def get_alias(sensor):
     """
@@ -134,7 +172,7 @@ def get_alias(sensor):
 
 
 @app.route("/")
-def get_activity():
+def view_activity():
     """
     A Flask route that responds to requests on the URL '/'. Builds an JSON object from the stored data.
     """
@@ -151,6 +189,27 @@ def get_activity():
             "history": history,
             "latest": history[0],
         })
+
+    if 'pretty' in request.args.keys():
+        return json.dumps(response, sort_keys=True, indent=4, separators=(',', ': '))
+    else:
+        return json.dumps(response)
+
+@app.route("/history/v1")
+@app.route("/history")
+def view_history():
+    sensors = {}
+
+    for sensor, alias, date, event in get_history_ranges():
+        if sensor not in sensors.keys():
+            sensors[sensor] = {'id': sensor, 'alias': alias, 'events': []}
+
+        date = date.replace(tzinfo=datetime.timezone.utc).isoformat()
+        sensors[sensor]['events'].append(
+            {'date': date, 'event': event}
+        )
+
+    response = list(sensors.values())
 
     if 'pretty' in request.args.keys():
         return json.dumps(response, sort_keys=True, indent=4, separators=(',', ': '))
