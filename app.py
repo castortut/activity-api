@@ -192,6 +192,8 @@ def view_activity():
 
     if 'pretty' in request.args.keys():
         return json.dumps(response, sort_keys=True, indent=4, separators=(',', ': '))
+    elif 'prettyhtml' in request.args.keys():
+        return json.dumps(response, sort_keys=True, indent=4, separators=(',', ': ')).replace('\n', '<br>')
     else:
         return json.dumps(response)
 
@@ -213,6 +215,8 @@ def view_history():
 
     if 'pretty' in request.args.keys():
         return json.dumps(response, sort_keys=True, indent=4, separators=(',', ': '))
+    elif 'prettyhtml' in request.args.keys():
+        return json.dumps(response, sort_keys=True, indent=4, separators=(',', ': ')).replace('\n', '<br>')
     else:
         return json.dumps(response)
 
