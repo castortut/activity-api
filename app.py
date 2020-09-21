@@ -2,7 +2,7 @@ import datetime
 import json
 import os
 
-from flask import Flask, request
+from flask import Flask, request, Response
 from flask_mqtt import Mqtt
 
 import psycopg2
@@ -191,11 +191,12 @@ def view_activity():
         })
 
     if 'pretty' in request.args.keys():
-        return json.dumps(response, sort_keys=True, indent=4, separators=(',', ': '))
-    elif 'prettyhtml' in request.args.keys():
-        return json.dumps(response, sort_keys=True, indent=4, separators=(',', ': ')).replace('\n', '<br>')
+        body = json.dumps(response, sort_keys=True, indent=4, separators=(',', ': '))
     else:
-        return json.dumps(response)
+        body = json.dumps(response)
+
+    return Response(body, mimetype='application/json')
+
 
 @app.route("/history/v1")
 @app.route("/history")
@@ -214,11 +215,11 @@ def view_history():
     response = list(sensors.values())
 
     if 'pretty' in request.args.keys():
-        return json.dumps(response, sort_keys=True, indent=4, separators=(',', ': '))
-    elif 'prettyhtml' in request.args.keys():
-        return json.dumps(response, sort_keys=True, indent=4, separators=(',', ': ')).replace('\n', '<br>')
+        body = json.dumps(response, sort_keys=True, indent=4, separators=(',', ': '))
     else:
-        return json.dumps(response)
+        body = json.dumps(response)
+
+    return Response(body, mimetype='application/json')
 
 
 if __name__ == '__main__':
