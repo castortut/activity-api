@@ -93,8 +93,8 @@ def handle_logging(client, userdata, level, buf) -> None:
     :param level: The level/severity of the message
     :param buf: Message contents
     """
-    if LOG_LEVELS[level] != 'DEBUG':
-        print(f"{LOG_LEVELS[level]}: {buf}")
+    #if LOG_LEVELS[level] != 'DEBUG':
+    print(f"{LOG_LEVELS[level]}: {buf}")
 
 
 def get_sensors():
